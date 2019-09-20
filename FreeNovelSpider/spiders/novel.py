@@ -6,6 +6,7 @@ import pymysql
 import scrapy
 from scrapy.utils.project import get_project_settings
 from elasticsearch import Elasticsearch
+from scrapy_redis.spiders import RedisSpider
 
 
 
@@ -36,11 +37,12 @@ def setargs(author, target, label, conn):
 
 
 
-class NovelSpider(scrapy.Spider):
+class NovelSpider(RedisSpider):
     name = 'novel'
     allowed_domains = ['reader.browser.duokan.com']
+    redis_key = 'myspider:start_urls'
     # 玄幻书籍 categoryId=3
-    start_urls = ['https://reader.browser.duokan.com/api/v2/book/list2?len=10&page=1&sex=1&bookStatus=0&categoryId=10&wordCountsInterval=0&hotChoice=0']
+    #start_urls = ['https://reader.browser.duokan.com/api/v2/book/list2?len=10&page=1&sex=1&bookStatus=0&categoryId=10&wordCountsInterval=0&hotChoice=0']
     # 都市
     # https://reader.browser.duokan.com/api/v2/book/list2?len=10&page=1&sex=1&bookStatus=0&categoryId=7&wordCountsInterval=0&hotChoice=0
     # 仙侠
@@ -49,6 +51,16 @@ class NovelSpider(scrapy.Spider):
     # https://reader.browser.duokan.com/api/v2/book/list2?len=3&page=1&sex=1&bookStatus=0&categoryId=8&wordCountsInterval=0&hotChoice=0
     # 灵异
     #https://reader.browser.duokan.com/api/v2/book/list2?len=10&page=1&sex=1&bookStatus=0&categoryId=10&wordCountsInterval=0&hotChoice=0
+    # 科幻
+    # https://reader.browser.duokan.com/api/v2/book/list2?len=10&page=1&sex=1&bookStatus=0&categoryId=11&wordCountsInterval=0&hotChoice=0
+    # 现代言情
+    # https://reader.browser.duokan.com/api/v2/book/list2?len=10&page=1&sex=2&bookStatus=0&categoryId=75&wordCountsInterval=0&hotChoice=0
+    # 古代言情
+    # https://reader.browser.duokan.com/api/v2/book/list2?len=10&page=1&sex=2&bookStatus=0&categoryId=74&wordCountsInterval=0&hotChoice=0
+    # 浪漫青春
+    # https://reader.browser.duokan.com/api/v2/book/list2?len=10&page=1&sex=2&bookStatus=0&categoryId=76&wordCountsInterval=0&hotChoice=0
+    # 玄幻言情
+    # https://reader.browser.duokan.com/api/v2/book/list2?len=10&page=1&sex=2&bookStatus=0&categoryId=72&wordCountsInterval=0&hotChoice=0
     # 将配置文件读到内存中，是一个字典
     settings = get_project_settings()
     host = settings['DB_HOST']
@@ -148,7 +160,7 @@ class NovelSpider(scrapy.Spider):
                     #number = chin_to_num(name)
                     created = int(str(chapter['updateTime'])[0:10])
                     i = created
-                    cursor.execute(sql % (name, created, created, novelId, chapterId))
+                    cursor.execute(sql % (pymysql.escape_string(name), created, created, novelId, chapterId))
                     self.conn.commit()
                     # 获取章节的id
                     cursor.execute(sql_find % (novelId, chapterId))
@@ -175,6 +187,9 @@ class NovelSpider(scrapy.Spider):
             contentList = data['contentList']
             content = '\t\r'.join(x for x in contentList)
             words = len(content)
+            # 将本章内容长度更新到章节words
+            sql = "update chapters set words='%s' where id='%s'"
+            cursor.execute(sql % (words, chapterid))
             # 数据库获取该章节更新时间
             sql = "select updated from chapters where id='%s';"
             cursor.execute(sql % chapterid)
@@ -182,7 +197,7 @@ class NovelSpider(scrapy.Spider):
             # 将数据保存数据库
             sql = "insert into contents(title,content,created,updated,words,chapterId,novelId) values('%s','%s','%s','%s','%s','%s','%s');"
             cursor.execute(sql % (
-                title, content, updated, updated, words, chapterid, novelId
+                pymysql.escape_string(title), pymysql.escape_string(content), updated, updated, words, chapterid, novelId
             ))
             self.conn.commit()
 

@@ -100,3 +100,14 @@ DB_CHARSET = 'utf8'
 # elasticsearch
 ES_HOST = 'localhost'
 
+# Redis
+REDIS_HOST = 'localhost'
+REDIS_PORT = 6379
+
+# 使用scrapy-redis组件的去重队列
+DUPEFILTER_CLASS = "scrapy_redis.dupefilter.RFPDupeFilter"
+# 使用scrapy-redis组件自己的调度器
+SCHEDULER = "scrapy_redis.scheduler.Scheduler"
+# 是否允许暂停
+SCHEDULER_PERSIST = True
+
