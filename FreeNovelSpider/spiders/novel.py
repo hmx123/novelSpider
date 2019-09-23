@@ -40,17 +40,17 @@ def setargs(author, target, label, conn):
 class NovelSpider(RedisSpider):
     name = 'novel'
     allowed_domains = ['reader.browser.duokan.com']
-    redis_key = 'myspider:start_urls'
+    redis_key = 'freespider:start_urls'
     # 玄幻书籍 categoryId=3
     #start_urls = ['https://reader.browser.duokan.com/api/v2/book/list2?len=10&page=1&sex=1&bookStatus=0&categoryId=10&wordCountsInterval=0&hotChoice=0']
     # 都市
-    # https://reader.browser.duokan.com/api/v2/book/list2?len=10&page=1&sex=1&bookStatus=0&categoryId=7&wordCountsInterval=0&hotChoice=0
+    # https://reader.browser.duokan.com/api/v2/book/list2?len=1&page=1&sex=1&bookStatus=0&categoryId=7&wordCountsInterval=0&hotChoice=0
     # 仙侠
-    #https://reader.browser.duokan.com/api/v2/book/list2?len=3&page=1&sex=1&bookStatus=0&categoryId=6&wordCountsInterval=0&hotChoice=0
+    # https://reader.browser.duokan.com/api/v2/book/list2?len=3&page=1&sex=1&bookStatus=0&categoryId=6&wordCountsInterval=0&hotChoice=0
     # 历史
     # https://reader.browser.duokan.com/api/v2/book/list2?len=3&page=1&sex=1&bookStatus=0&categoryId=8&wordCountsInterval=0&hotChoice=0
     # 灵异
-    #https://reader.browser.duokan.com/api/v2/book/list2?len=10&page=1&sex=1&bookStatus=0&categoryId=10&wordCountsInterval=0&hotChoice=0
+    # https://reader.browser.duokan.com/api/v2/book/list2?len=10&page=1&sex=1&bookStatus=0&categoryId=10&wordCountsInterval=0&hotChoice=0
     # 科幻
     # https://reader.browser.duokan.com/api/v2/book/list2?len=10&page=1&sex=1&bookStatus=0&categoryId=11&wordCountsInterval=0&hotChoice=0
     # 现代言情
