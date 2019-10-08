@@ -71,11 +71,13 @@ class NovelSpider(RedisSpider):
     dbcharset = settings['DB_CHARSET']
     # es_host = settings['ES_HOST']
 
-    conn = pymysql.Connect(host=host, port=port, user=user, password=password, db=dbname, charset=dbcharset)
+    conn = ''
     es = Elasticsearch()
     # es.indices.create(index='novel-index', ignore=400)
 
     def parse(self, response):
+        conn = pymysql.Connect(host=self.host, port=self.port, user=self.user, password=self.password, db=self.dbname, charset=self.dbcharset)
+        self.conn = conn
         results = json.loads(response.text)
         cursor = self.conn.cursor()
         if results['status'] == 0 and results['data']:
@@ -95,20 +97,16 @@ class NovelSpider(RedisSpider):
                     state = 3
                 #enabled = 1   是否可读
                 words = book['wordCount']
-                created = book['updateTime']
-                # updated = 最后更新时间  获取最后一章节后 设置
+                updated = book['updateTime']
+                # created = 第一章更新时间   设置
                 author = book['author']    # 作者 回调设置到作者表 后获取
                 target = book['tags']   # 标签 设置标签表中回调 后获取
                 score = book['score']
                 # 判断小说是否存在
-                sql = "select id from novels where bookId='%s';"
-                if not cursor.execute(sql % bookId):
+                sql = "select id from novels where name='%s' and bookId='%s';"
+                if not cursor.execute(sql % (name, bookId)):
                     setargs(author, target, label, self.conn)
                     # 保存数据库
-                    # 从数据库中获取关联id
-                    sql = "select id from author where name='%s';"
-                    cursor.execute(sql % author)
-                    authorId = cursor.fetchone()[0]  # 作者id
                     tag_list = []
                     for tag in target:
                         sql = "select id from novel_tag where target='%s';"
@@ -119,16 +117,26 @@ class NovelSpider(RedisSpider):
                     sql = "select id from novel_type where type='%s';"
                     cursor.execute(sql % label)
                     typeId = cursor.fetchone()[0]    # 分类id
-                    sql = "insert into novels(name,cover,summary,label,state,words,created,authorId,target,score,bookId) values('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s');"
+                    now_time = datetime.now()
+                    now_time = now_time.strftime("%Y-%m-%d %H:%M:%S")
+                    # 从数据库中获取关联id
+                    sql = "select id from author where name='%s';"
+                    cursor.execute(sql % author)
+                    try:
+                        authorId = cursor.fetchone()[0]  # 作者id
+                    except Exception as e:
+                        authorId = 170
+                        print(e)
+                    sql = "insert into novels(name,cover,summary,label,state,words,updated,authorId,target,score,bookId,addtime,novel_web) values('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s');"
                     cursor.execute(sql % (
-                        name, cover, summary, typeId, state, words, created, authorId, tag_str, score, bookId
+                        name, cover, summary, typeId, state, words, updated, authorId, tag_str, score, bookId, now_time, '1'
                     ))
                     self.conn.commit()
 
                     # 中间表关联小说id 和 标签 id
                     # 获取小说id
-                    sql = "select id from novels where bookId='%s';"
-                    cursor.execute(sql % bookId)
+                    sql = "select id from novels where bookId='%s' and name='%s';"
+                    cursor.execute(sql % (bookId, name))
                     novelId = cursor.fetchone()[0]
                     sql = "insert into middle_tag_nov(tagId,novelId) values('%s','%s');"
                     for tagid in tag_list:
@@ -151,15 +159,19 @@ class NovelSpider(RedisSpider):
             sql = "insert into chapters(name,created,updated,novelId,chapterId) values('%s','%s','%s','%s','%s');"
             sql_find = "select id from chapters where novelId='%s' and chapterId='%s';"
             i = ''
+            count = 1
             for chapter in datalist:
                 name = chapter['chapterName']
                 chapterId = chapter['chapterId']
                 # 判断数据库是否存在 novelId chapterId
+                if count == 1:
+                    created = int(str(chapter['updateTime'])[0:10])
+                    i = created
+                count += 1
                 if not cursor.execute(sql_find % (novelId, chapterId)):
                     # 根据章节名称获取章节num
                     #number = chin_to_num(name)
                     created = int(str(chapter['updateTime'])[0:10])
-                    i = created
                     cursor.execute(sql % (pymysql.escape_string(name), created, created, novelId, chapterId))
                     self.conn.commit()
                     # 获取章节的id
@@ -170,7 +182,7 @@ class NovelSpider(RedisSpider):
                     yield scrapy.Request(url=url, callback=self.parse_content, meta={'chapterid': chapterid, 'novelId': novelId})
 
             # 把最后的更新时间添加到书籍
-            sql = "update novels set updated='%s' where id='%s'"
+            sql = "update novels set created='%s' where id='%s'"
             cursor.execute(sql % (i, novelId))
             self.conn.commit()
 

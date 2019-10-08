@@ -53,11 +53,13 @@ class NovelSpider(RedisSpider):
     dbcharset = settings['DB_CHARSET']
     # es_host = settings['ES_HOST']
 
-    conn = pymysql.Connect(host=host, port=port, user=user, password=password, db=dbname, charset=dbcharset)
+    conn = ''
     es = Elasticsearch()
     # es.indices.create(index='novel-index', ignore=400)
 
     def parse(self, response):
+        conn = pymysql.Connect(host=self.host, port=self.port, user=self.user, password=self.password, db=self.dbname, charset=self.dbcharset)
+        self.conn = conn
         results = json.loads(response.text)
         cursor = self.conn.cursor()
         if results['status'] == 0 and results['data']:
@@ -76,13 +78,14 @@ class NovelSpider(RedisSpider):
                 state = 3
             #enabled = 1   是否可读
             words = bookInfo['wordCount']
-            created = bookInfo['updateTime']
-            # updated = 最后更新时间  获取最后一章节后 设置
+            updated = bookInfo['updateTime']
+            created = results['data']['firstChapter']['updateTime'][0:10]
             author = bookInfo['author']    # 作者 回调设置到作者表 后获取
             target = bookInfo['tags']   # 标签 设置标签表中回调 后获取
             score = bookInfo['score']
             # 判断小说是否存在
             sql = "select id from novels where bookId='%s';"
+            novelId = ''
             if not cursor.execute(sql % bookId):
                 setargs(author, target, label, self.conn)
                 # 保存数据库
@@ -100,9 +103,11 @@ class NovelSpider(RedisSpider):
                 sql = "select id from novel_type where type='%s';"
                 cursor.execute(sql % label)
                 typeId = cursor.fetchone()[0]    # 分类id
-                sql = "insert into novels(name,cover,summary,label,state,words,created,authorId,target,score,bookId) values('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s');"
+                now_time = datetime.now()
+                now_time = now_time.strftime("%Y-%m-%d %H:%M:%S")
+                sql = "insert into novels(name,cover,summary,label,state,words,created,updated,authorId,target,score,bookId,addtime,novel_web) values('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s');"
                 cursor.execute(sql % (
-                    name, cover, summary, typeId, state, words, created, authorId, tag_str, score, bookId
+                    name, cover, summary, typeId, state, words, created, updated, authorId, tag_str, score, bookId, now_time, '1'
                 ))
                 self.conn.commit()
 
@@ -118,6 +123,10 @@ class NovelSpider(RedisSpider):
                 # 将小说名字添加到elasticsearch索引
                 self.es.index(index="novel-index", id=novelId, body={"title": name, "timestamp": datetime.now()})
                 # 拼接章节url
+                url = 'https://reader.browser.duokan.com/api/v2/chapter/list/%s' % bookId
+                yield scrapy.Request(url=url, callback=self.parse_chaper, meta={'novelId': novelId, 'bookId': bookId})
+            # 如果存在 更新章节
+            else:
                 url = 'https://reader.browser.duokan.com/api/v2/chapter/list/%s' % bookId
                 yield scrapy.Request(url=url, callback=self.parse_chaper, meta={'novelId': novelId, 'bookId': bookId})
 
@@ -140,7 +149,6 @@ class NovelSpider(RedisSpider):
                     # 根据章节名称获取章节num
                     #number = chin_to_num(name)
                     created = int(str(chapter['updateTime'])[0:10])
-                    i = created
                     cursor.execute(sql % (pymysql.escape_string(name), created, created, novelId, chapterId))
                     self.conn.commit()
                     # 获取章节的id
@@ -150,10 +158,7 @@ class NovelSpider(RedisSpider):
                     url = 'https://reader.browser.duokan.com/api/v2/chapter/content/%s/?chapterId=%s&volumeId=1' % (bookId, chapterId)
                     yield scrapy.Request(url=url, callback=self.parse_content, meta={'chapterid': chapterid, 'novelId': novelId})
 
-            # 把最后的更新时间添加到书籍
-            sql = "update novels set updated='%s' where id='%s'"
-            cursor.execute(sql % (i, novelId))
-            self.conn.commit()
+
 
 
     def parse_content(self, response):
