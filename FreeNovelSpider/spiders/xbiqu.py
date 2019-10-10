@@ -93,9 +93,9 @@ class XBiquSpider(RedisSpider):
             except Exception as e:
                 authorId = 170
                 print(e)
-            sql = "insert into novels(name,cover,summary,label,state,words,created,updated,authorId,target,score,bookId,addtime,novel_web) values('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s');"
+            sql = "insert into novels(name,cover,summary,label,state,words,created,updated,authorId,target,score,bookId,addtime,novel_web,updatetime) values('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s');"
             cursor.execute(sql % (
-                novel_name, novel_img, novel_info, label, '1', words, '0', updated, authorId, '', '9.5',  bookId, now_time, '2'
+                novel_name, novel_img, novel_info, label, '1', words, '0', updated, authorId, '', '9.5',  bookId, now_time, '2', now_time
             ))
             conn.commit()
             # 获取小说id
@@ -112,6 +112,8 @@ class XBiquSpider(RedisSpider):
         else:
             #更新
             novelId = fin[0]
+            now_time = datetime.now()
+            now_time = now_time.strftime("%Y-%m-%d %H:%M:%S")
             for chapter in chapters:
                 # 判断章节是否存在
                 sql_find = "select id from chapters where novelId='%s' and chapterId='%s';"
@@ -119,6 +121,10 @@ class XBiquSpider(RedisSpider):
                 chapterId  = chapter_url.split('/')[-1].split('.')[0]
                 # 判断数据库是否存在 novelId chapterId
                 if not cursor.execute(sql_find % (novelId, chapterId)):
+                    # 更新小说表小说更新时间
+                    sql_update = "update novels set updatetime='%s' where id='%s';"
+                    cursor.execute(sql_update % (now_time, novelId))
+                    conn.commit()
                     # 拼接章节url http://www.xbiquge.la/19/19523/10080224.html
                     url = 'http://www.xbiquge.la' + chapter_url
                     yield scrapy.Request(url=url, callback=self.parse_chaper, meta={'novelId': novelId, 'bookId': bookId})

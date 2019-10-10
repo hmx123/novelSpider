@@ -127,9 +127,9 @@ class NovelSpider(RedisSpider):
                     except Exception as e:
                         authorId = 170
                         print(e)
-                    sql = "insert into novels(name,cover,summary,label,state,words,updated,authorId,target,score,bookId,addtime,novel_web) values('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s');"
+                    sql = "insert into novels(name,cover,summary,label,state,words,updated,authorId,target,score,bookId,addtime,novel_web,updatetime) values('%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s');"
                     cursor.execute(sql % (
-                        name, cover, summary, typeId, state, words, updated, authorId, tag_str, score, bookId, now_time, '1'
+                        name, cover, summary, typeId, state, words, updated, authorId, tag_str, score, bookId, now_time, '1', now_time
                     ))
                     self.conn.commit()
 
@@ -163,6 +163,8 @@ class NovelSpider(RedisSpider):
             for chapter in datalist:
                 name = chapter['chapterName']
                 chapterId = chapter['chapterId']
+                # 获取章节volumeId 参数
+                volumeId = chapter['volumeIndex']
                 # 判断数据库是否存在 novelId chapterId
                 if count == 1:
                     created = int(str(chapter['updateTime'])[0:10])
@@ -178,13 +180,10 @@ class NovelSpider(RedisSpider):
                     cursor.execute(sql_find % (novelId, chapterId))
                     chapterid = cursor.fetchone()[0]
                     # 回调获取章节详情内容
-                    url = 'https://reader.browser.duokan.com/api/v2/chapter/content/%s/?chapterId=%s&volumeId=1' % (bookId, chapterId)
+                    url = 'https://reader.browser.duokan.com/api/v2/chapter/content/%s/?chapterId=%s&volumeId=%s' % (bookId, chapterId, volumeId)
                     yield scrapy.Request(url=url, callback=self.parse_content, meta={'chapterid': chapterid, 'novelId': novelId})
 
-            # 把最后的更新时间添加到书籍
-            sql = "update novels set created='%s' where id='%s'"
-            cursor.execute(sql % (i, novelId))
-            self.conn.commit()
+
 
 
     def parse_content(self, response):
@@ -193,6 +192,7 @@ class NovelSpider(RedisSpider):
         novelId = response.meta['novelId']
         results = json.loads(response.text)
         if results['status'] == 0:
+            self.conn.ping(reconnect=True)
             cursor = self.conn.cursor()
             data = results['data']
             title = data['title']
