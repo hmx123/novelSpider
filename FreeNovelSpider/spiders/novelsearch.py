@@ -79,14 +79,14 @@ class NovelSpider(RedisSpider):
             #enabled = 1   是否可读
             words = bookInfo['wordCount']
             updated = bookInfo['updateTime']
-            created = results['data']['firstChapter']['updateTime'][0:10]
+            created = str(results['data']['firstChapter']['updateTime'])[0:10]
             author = bookInfo['author']    # 作者 回调设置到作者表 后获取
             target = bookInfo['tags']   # 标签 设置标签表中回调 后获取
             score = bookInfo['score']
             # 判断小说是否存在
             sql = "select id from novels where bookId='%s';"
-            novelId = ''
-            if not cursor.execute(sql % bookId):
+            result = cursor.execute(sql % bookId)
+            if not result:
                 setargs(author, target, label, self.conn)
                 # 保存数据库
                 # 从数据库中获取关联id
@@ -127,6 +127,7 @@ class NovelSpider(RedisSpider):
                 yield scrapy.Request(url=url, callback=self.parse_chaper, meta={'novelId': novelId, 'bookId': bookId})
             # 如果存在 更新章节
             else:
+                novelId = cursor.fetchone()[0]
                 url = 'https://reader.browser.duokan.com/api/v2/chapter/list/%s' % bookId
                 yield scrapy.Request(url=url, callback=self.parse_chaper, meta={'novelId': novelId, 'bookId': bookId})
 
@@ -142,7 +143,9 @@ class NovelSpider(RedisSpider):
             sql_find = "select id from chapters where novelId='%s' and chapterId='%s';"
             now_time = datetime.now()
             now_time = now_time.strftime("%Y-%m-%d %H:%M:%S")
+            chapter_count = 0  # 记录章节总数
             for chapter in datalist:
+                chapter_count += 1
                 name = chapter['chapterName']
                 chapterId = chapter['chapterId']
                 # 获取章节volumeId 参数
@@ -156,6 +159,7 @@ class NovelSpider(RedisSpider):
                     #number = chin_to_num(name)
                     created = int(str(chapter['updateTime'])[0:10])
                     cursor.execute(sql % (pymysql.escape_string(name), created, created, novelId, chapterId))
+
                     self.conn.commit()
                     # 获取章节的id
                     cursor.execute(sql_find % (novelId, chapterId))
@@ -163,6 +167,10 @@ class NovelSpider(RedisSpider):
                     # 回调获取章节详情内容
                     url = 'https://reader.browser.duokan.com/api/v2/chapter/content/%s/?chapterId=%s&volumeId=%s' % (bookId, chapterId, volumeId)
                     yield scrapy.Request(url=url, callback=self.parse_content, meta={'chapterid': chapterid, 'novelId': novelId})
+
+            sql = "update novels set chaptercount= '%s' where id='%s';"
+            cursor.execute(sql % (chapter_count, novelId))
+            self.conn.commit()
 
 
 

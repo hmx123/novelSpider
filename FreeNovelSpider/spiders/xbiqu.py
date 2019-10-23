@@ -70,7 +70,7 @@ class XBiquSpider(RedisSpider):
         novel_lastupt = response.xpath('//div[@id="info"]/p[3]/text()').extract_first().split('：')[1]
         novel_type = response.xpath('//div[@class="con_top"]/a[2]/text()').extract_first()
         chapters = response.xpath('//div[@id="list"]/dl/dd/a/@href')
-        type_dict = {'修真小说': '5', '玄幻小说': '4', '都市小说': '3', '历史小说': '6', '网游小说': '8', '科幻小说': '8', '其他小说': '4'}
+        type_dict = {'修真小说': '5', '玄幻小说': '4', '都市小说': '3', '历史小说': '6', '网游小说': '14', '科幻小说': '8', '其他小说': '4'}
         try:
             label = type_dict[novel_type]
         except:
@@ -104,8 +104,9 @@ class XBiquSpider(RedisSpider):
             novelId = cursor.fetchone()[0]
             # 将小说名字添加到elasticsearch索引
             self.es.index(index="novel-index", id=novelId, body={"title": novel_name, "timestamp": datetime.now()})
-
+            chapter_count = 0  # 记录章节总数
             for chapter in chapters:
+                chapter_count += 1
                 # 拼接章节url http://www.xbiquge.la/19/19523/10080224.html
                 url = 'http://www.xbiquge.la' + chapter.extract()
                 yield scrapy.Request(url=url, callback=self.parse_chaper, meta={'novelId': novelId, 'bookId': bookId})
@@ -114,7 +115,9 @@ class XBiquSpider(RedisSpider):
             novelId = fin[0]
             now_time = datetime.now()
             now_time = now_time.strftime("%Y-%m-%d %H:%M:%S")
+            chapter_count = 0   # 记录章节总数
             for chapter in chapters:
+                chapter_count += 1
                 # 判断章节是否存在
                 sql_find = "select id from chapters where novelId='%s' and chapterId='%s';"
                 chapter_url = chapter.extract()
@@ -122,13 +125,15 @@ class XBiquSpider(RedisSpider):
                 # 判断数据库是否存在 novelId chapterId
                 if not cursor.execute(sql_find % (novelId, chapterId)):
                     # 更新小说表小说更新时间
-                    sql_update = "update novels set updatetime='%s' where id='%s';"
-                    cursor.execute(sql_update % (now_time, novelId))
+                    sql_update = "update novels set updated='%s',updatetime='%s' where id='%s';"
+                    cursor.execute(sql_update % (updated, now_time, novelId))
                     conn.commit()
                     # 拼接章节url http://www.xbiquge.la/19/19523/10080224.html
                     url = 'http://www.xbiquge.la' + chapter_url
                     yield scrapy.Request(url=url, callback=self.parse_chaper, meta={'novelId': novelId, 'bookId': bookId})
-
+        sql = "update novels set chaptercount= '%s' where id='%s';"
+        cursor.execute(sql % (chapter_count, novelId))
+        conn.commit()
 
     def parse_chaper(self, response):
         '''请求章节数据'''
