@@ -8,6 +8,7 @@
 #     https://docs.scrapy.org/en/latest/topics/settings.html
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
+import os
 
 BOT_NAME = 'FreeNovelSpider'
 
@@ -92,8 +93,8 @@ ROBOTSTXT_OBEY = False
 # 数据库的配置参数
 DB_HOST = '127.0.0.1'
 DB_PORT = 3306
-DB_USER = 'root'
-DB_PASSWORD = 'root'
+DB_USER = os.environ.get('MySQLUser')
+DB_PASSWORD = os.environ.get('MySQLPassword')
 DB_NAME = 'novels'
 DB_CHARSET = 'utf8'
 
@@ -110,4 +111,4 @@ DUPEFILTER_CLASS = "scrapy_redis.dupefilter.RFPDupeFilter"
 SCHEDULER = "scrapy_redis.scheduler.Scheduler"
 # 是否允许暂停
 SCHEDULER_PERSIST = True
-
+LOG_LEVEL = 'ERROR'
