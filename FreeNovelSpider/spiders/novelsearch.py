@@ -120,8 +120,11 @@ class NovelSpider(RedisSpider):
                 for tagid in tag_list:
                     cursor.execute(sql % (tagid, novelId))
                 self.conn.commit()
-                # 将小说名字添加到elasticsearch索引
-                self.es.index(index="novel-index", id=novelId, body={"title": name, "timestamp": datetime.now()})
+                try:
+                    # 将小说名字添加到elasticsearch索引
+                    self.es.index(index="novel-index", id=novelId, body={"title": name, "timestamp": datetime.now()})
+                except Exception as e:
+                    print('%s-----------%s' % (now_time, e))
                 # 拼接章节url
                 url = 'https://reader.browser.duokan.com/api/v2/chapter/list/%s' % bookId
                 yield scrapy.Request(url=url, callback=self.parse_chaper, meta={'novelId': novelId, 'bookId': bookId})

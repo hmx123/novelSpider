@@ -74,12 +74,12 @@ class XBiquSpider(RedisSpider):
         # 正则匹配到数字
         pattern = re.compile(r'\d+')   # 查找数字
         novel_word_count = '%s0000' % pattern.findall(word_count)[0]
-        type_dict = {'仙侠修真': '5', '玄幻魔法': '4', '都市言情': '3', '历史军事': '6', '网游竞技': '14', '科幻灵异': '8', '恐怖惊悚': '7', '其他类型': '4'}
+        type_dict = {'仙侠修真': '5', '玄幻魔法': '4', '都市言情': '9', '历史军事': '6', '网游竞技': '21', '科幻灵异': '8', '恐怖惊悚': '7', '其他类型': '4'}
         try:
             label = type_dict[novel_type]
         except:
             label = '4'
-        updated = time.mktime(time.strptime(novel_lastupt, "%Y-%m-%d %H:%M"))
+        updated = int(time.mktime(time.strptime(novel_lastupt, "%Y-%m-%d %H:%M")))
         # 判断小说是否存在数据库
         sql_find = "select id from novels where name='%s' and bookId='%s' and novel_web=3;"
         cursor.execute(sql_find % (novel_name, bookId))
@@ -106,8 +106,11 @@ class XBiquSpider(RedisSpider):
             sql = "select id from novels where bookId='%s' and name='%s';"
             cursor.execute(sql % (bookId, novel_name))
             novelId = cursor.fetchone()[0]
-            # 将小说名字添加到elasticsearch索引
-            self.es.index(index="novel-index", id=novelId, body={"title": novel_name, "timestamp": datetime.now()})
+            try:
+                # 将小说名字添加到elasticsearch索引
+                self.es.index(index="novel-index", id=novelId, body={"title": novel_name, "timestamp": datetime.now()})
+            except Exception as e:
+                print('%s-----------%s' % (now_time, e))
             chapter_count = 0  # 记录章节总数
             for chapter in chapters:
                 chapter_count += 1
