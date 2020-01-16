@@ -63,10 +63,15 @@ class BiquSpider(RedisSpider):
         label_str = response.xpath('//div[@class="info"]/p[@class="tip"]/span[@class="block ticai"]/text()').extract_first()
         label_str = label_str.split('：')[-1]
         label_dict = {
-            '冒险热血': '2,6,16', '武侠格斗': '16,2,1', '科幻魔幻': '10,16,8', '侦探推理': '5,17,8', '耽美爱情': '3,5', '生活漫画': '9,14,7', '玄幻科幻': '6,10,12'
+            '冒险热血': '2,16', '武侠格斗': '16,2', '科幻魔幻': '10,16', '侦探推理': '5,17', '耽美爱情': '3,5', '生活漫画': '9,14,7', '玄幻科幻': '6,10'
         }
         if label_str in label_dict:
             label = label_dict[label_str]
+            label_list = label.split(',')
+            rand_num = random.randint(1, 18)
+            while rand_num in label_list:
+                rand_num = random.randint(1, 18)
+            label += ',%s' % rand_num
         else:
             label = '17'
         updatetime = response.xpath('//div[@class="info"]/p[@class="tip"]/span[@class="block"][2]/text()').extract_first()
